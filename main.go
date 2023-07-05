@@ -109,7 +109,7 @@ func main() {
 	remove_tree(git_wt, target, rel, files)
 
 	// dump state file
-	os.Remove(git_target + "/gofuse.json")
+	os.Remove(target + "/gofuse.json")
 	fh, err = os.Create(target + "/gofuse.json")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening file %q: %s\n", target + "/gofuse.json", err.Error())
