@@ -12,7 +12,8 @@ import "github.com/go-git/go-git/v5/plumbing/filemode"
 import "github.com/go-git/go-git/v5/plumbing/object"
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "gofuse <target-dir> <remote-git> <git-spec>\n")
+	fmt.Fprintf(os.Stderr, "gofuse update <target-dir>\n")
+	fmt.Fprintf(os.Stderr, "gofuse get <target-dir> <remote-git> <git-spec>\n")
 	os.Exit(1)
 }
 
@@ -33,15 +34,29 @@ func main() {
 	var rel string
 	var gomod []byte
 	var git_id string
+	var jdec *json.Decoder
+	var st State
 
-	if len(os.Args) != 4 {
-		fmt.Fprintf(os.Stderr, "gofuse require 3 arguments, got %d\n", len(os.Args) - 1)
+	if len(os.Args) < 2 {
 		usage()
 	}
+	if os.Args[1] != "get" && os.Args[1] != "update" {
+		fmt.Fprintf(os.Stderr, "unknwon command %q\n", os.Args[1])
+		usage()
+	}
+	if os.Args[1] == "get" {
+		if len(os.Args) != 5 {
+			fmt.Fprintf(os.Stderr, "gofuse get require 3 arguments, got %d\n", len(os.Args) - 2)
+			usage()
+		}
 
-	arg_target = os.Args[1]
-	git_target = os.Args[2]
-	git_refspec = os.Args[3]
+		arg_target = os.Args[2]
+		git_target = os.Args[3]
+		git_refspec = os.Args[4]
+	}
+	if os.Args[1] == "update" {
+		arg_target = os.Args[2]
+	}
 
 	// Get absolute path of target. Target must not exists, or must be a directory
 	target, err = path_abs(arg_target)
@@ -76,6 +91,29 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error searching go.mod in %q: %s\n", target, err.Error())
 		os.Exit(1)
+	}
+
+	if os.Args[1] == "update" {
+
+		// Load state file
+		fh, err = os.Open(target + "/gofuse.json")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading state file %q: %s\n", target + "/gofuse.json", err.Error())
+			os.Exit(1)
+		}
+
+		// Read state file
+		jdec = json.NewDecoder(fh)
+		err = jdec.Decode(&st)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error decoding state file %q: %s\n", target + "/gofuse.json", err.Error())
+			os.Exit(1)
+		}
+		fh.Close()
+
+		// setup values
+		git_target = st.Repo
+		git_refspec = st.Refspec
 	}
 
 	// Open remote git directory

@@ -61,4 +61,5 @@ Usage
 
 To load or update a project:
 
-   `gofuse <target-directory> <git-repository-path> <version>`
+- `gofuse get <target-directory> <git-repository-path> <version>`
+- `gofuse update <target-directory>`
