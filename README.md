@@ -61,5 +61,14 @@ Usage
 
 To load or update a project:
 
-- `gofuse get <target-directory> <git-repository-path> <version>`
-- `gofuse update <target-directory>`
+- List all gofuse directories in current project:
+
+  `gofuse list`
+
+- Get new gofuse library, update existing if gofuse directory exists
+
+  `gofuse get <target-directory> <git-repository-path> <version>`
+
+- Update existing gofuse directory. Work only if the git refspec is not an absolute pointer. It works with branch name. If the refspec is absolute (tag, id), you should use `gofuse get` to give a new refspec
+
+  `gofuse update <target-directory>`
