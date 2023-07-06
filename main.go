@@ -12,6 +12,7 @@ import "github.com/go-git/go-git/v5/plumbing/filemode"
 import "github.com/go-git/go-git/v5/plumbing/object"
 
 func usage() {
+	fmt.Fprintf(os.Stderr, "gofuse list\n")
 	fmt.Fprintf(os.Stderr, "gofuse update <target-dir>\n")
 	fmt.Fprintf(os.Stderr, "gofuse get <target-dir> <remote-git> <git-spec>\n")
 	os.Exit(1)
@@ -40,7 +41,7 @@ func main() {
 	if len(os.Args) < 2 {
 		usage()
 	}
-	if os.Args[1] != "get" && os.Args[1] != "update" {
+	if os.Args[1] != "get" && os.Args[1] != "update" && os.Args[1] != "list" {
 		fmt.Fprintf(os.Stderr, "unknwon command %q\n", os.Args[1])
 		usage()
 	}
@@ -57,12 +58,31 @@ func main() {
 	if os.Args[1] == "update" {
 		arg_target = os.Args[2]
 	}
+	if os.Args[1] == "list" {
+		target, err = os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Can't get current directory: %s\n", err.Error())
+			os.Exit(1)
+		}
+	}
 
 	// Get absolute path of target. Target must not exists, or must be a directory
 	target, err = path_abs(arg_target)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error with target directory %q: %s\n", arg_target, err.Error())
 		os.Exit(1)
+	}
+
+	if os.Args[1] == "list" {
+
+		// Search all gofuse.json file, display reference and quit
+		err = gofuse_summary(target, target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "An error occurs: %s\n", err.Error())
+			os.Exit(1)
+		}
+		os.Exit(0)
+
 	}
 
 	// Search git directory
@@ -370,4 +390,56 @@ func remove_tree(git_wt *git.Worktree, target string, rel string, files []string
 			}
 		}
 	}
+}
+
+func gofuse_summary(base string, target string)(error) {
+	var entries []fs.DirEntry
+	var entry fs.DirEntry
+	var fh *os.File
+	var jdec *json.Decoder
+	var st State
+	var err error
+
+	entries, err = os.ReadDir(target)
+	if err != nil {
+		return fmt.Errorf("cant open directory %q: %s", target, err.Error())
+	}
+
+	for _, entry = range entries {
+		if !entry.IsDir() && entry.Name() == "gofuse.json" {
+			// Load state file
+			fh, err = os.Open(target + "/gofuse.json")
+			if err != nil {
+				return fmt.Errorf("error loading state file %q: %s\n", target + "/gofuse.json", err.Error())
+			}
+
+			// Read state file
+			jdec = json.NewDecoder(fh)
+			err = jdec.Decode(&st)
+			if err != nil {
+				return fmt.Errorf("error decoding state file %q: %s\n", target + "/gofuse.json", err.Error())
+			}
+			fh.Close()
+
+			// Display data
+			fmt.Printf("%s %s %s\n", target[len(base)+1:], st.Repo, st.Refspec)
+
+			// Once we found a gofuse directory, it cannot have gofuse childrens
+			return nil
+		}
+	}
+
+	// Browse directories
+	for _, entry = range entries {
+		if entry.IsDir() {
+			if entry.Name() == ".git" {
+				continue
+			}
+			err = gofuse_summary(base, target + "/" + entry.Name())
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
